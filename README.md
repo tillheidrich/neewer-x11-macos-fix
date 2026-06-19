@@ -207,8 +207,7 @@ Threads that surfaced the problem (and that this fix answers):
 - r/MacOS — Elgato Prompter + DisplayLink on macOS 26 (same symptom, different chip): <https://www.reddit.com/r/MacOS/comments/1skb931/>
 - r/neewer — X11 cable / driver availability: <https://www.reddit.com/r/neewer/comments/1qg70ru/>
 
-Ready-to-post write-ups are in [`REDDIT.md`](REDDIT.md). Full attribution in
-[`SOURCES.md`](SOURCES.md).
+Full attribution in [`SOURCES.md`](SOURCES.md).
 
 ## Publish to GitHub
 
