@@ -1,0 +1,51 @@
+#!/bin/bash
+# postinstall — runs as root after the toolkit is laid down.
+# It removes the stale driver and installs the CURRENT official MacroSilicon build.
+# Everything it does is logged to /tmp/neewer-x11-fix.log and printed below.
+set -u
+
+DRIVER_URL="http://www.macrosilicon.com:9080/download/USBDisplay/macOS/Installer/MacroSilicon_UsbDisplay_V3.3.2.59_20260320_1655.pkg"
+BIN=/usr/local/bin/MacUsbDisplay
+UNINST=/usr/local/bin/usbdisplay_uninstall
+PLIST=/Library/LaunchAgents/com.macrosilicon.usbdisplay.plist
+LABEL=com.macrosilicon.usbdisplay
+LOG=/tmp/neewer-x11-fix.log
+CONSOLE_UID="$(stat -f %u /dev/console 2>/dev/null || echo 501)"
+
+{
+  echo "=== Neewer X11 fix — $(date) ==="
+  echo "Source (official MacroSilicon): $DRIVER_URL"
+
+  echo "--- 1/3 removing any old driver ---"
+  launchctl bootout "gui/$CONSOLE_UID/$LABEL" 2>/dev/null || true
+  [ -x "$UNINST" ] && "$UNINST" 2>/dev/null || true
+  rm -f "$BIN" "$UNINST" "$PLIST"
+  pkgutil --forget "$LABEL" 2>/dev/null || true
+
+  echo "--- 2/3 locating the driver ---"
+  TMP="$(mktemp -d)"; PKG=""
+  BUNDLED="$(ls /usr/local/share/neewer-x11-fix/driver/*.pkg 2>/dev/null | head -1 || true)"
+  if [ -n "$BUNDLED" ]; then
+    echo "using EMBEDDED driver: $BUNDLED (no download needed)"
+    PKG="$BUNDLED"
+  else
+    echo "no embedded driver — downloading from official MacroSilicon server"
+    if /usr/bin/curl -fL --retry 3 --connect-timeout 20 -o "$TMP/driver.pkg" "$DRIVER_URL"; then
+      echo "downloaded $(wc -c < "$TMP/driver.pkg") bytes"; PKG="$TMP/driver.pkg"
+    else
+      echo "ERROR: no embedded driver and download failed (offline?). Run install-latest.sh later."
+    fi
+  fi
+
+  if [ -n "$PKG" ]; then
+    echo "--- 3/3 installing driver ---"
+    /usr/sbin/installer -pkg "$PKG" -target / && echo "driver installed OK" || echo "WARN: driver install returned nonzero"
+  fi
+  rm -rf "$TMP"
+  echo "=== done — RESTART, then grant Screen Recording to MacUsbDisplay ==="
+} >>"$LOG" 2>&1
+
+# Friendly native dialog so the user isn't left guessing.
+/usr/bin/osascript -e 'display dialog "Neewer X11 driver installed.\n\nNext steps:\n1) Restart your Mac\n2) System Settings → Privacy & Security → Screen & System Audio Recording → enable MacUsbDisplay\n3) Log out & back in\n\nLog: /tmp/neewer-x11-fix.log" buttons {"OK"} default button "OK" with title "Neewer X11 Driver Fix" with icon note' >/dev/null 2>&1 || true
+
+exit 0
